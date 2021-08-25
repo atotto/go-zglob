@@ -207,7 +207,7 @@ func glob(pattern string, followSymlinks bool) ([]string, error) {
 	relative := !filepath.IsAbs(pattern)
 	matches := []string{}
 
-	err = fastwalk.FastWalk(zenv.root, func(path string, info os.FileMode) error {
+	err = fastwalk.Walk(zenv.root, func(path string, info os.FileMode) error {
 		if zenv.root == "." && len(zenv.root) < len(path) {
 			path = path[len(zenv.root)+1:]
 		}
@@ -218,7 +218,7 @@ func glob(pattern string, followSymlinks bool) ([]string, error) {
 			if err == nil {
 				fi, err := os.Lstat(followedPath)
 				if err == nil && fi.IsDir() {
-					return fastwalk.TraverseLink
+					return fastwalk.ErrTraverseLink
 				}
 			}
 		}
