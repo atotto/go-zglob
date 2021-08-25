@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mattn/go-zglob/fastwalk"
+	"github.com/karrick/godirwalk"
 )
 
 var (
@@ -160,46 +160,46 @@ func glob(pattern string, followSymlinks bool) ([]string, error) {
 	relative := !filepath.IsAbs(pattern)
 	matches := []string{}
 
-	fastwalk.FastWalk(zenv.root, func(path string, info os.FileMode) error {
-		if zenv.root == "." && len(zenv.root) < len(path) {
-			path = path[len(zenv.root)+1:]
-		}
-		path = filepath.ToSlash(path)
-
-		if followSymlinks && info == os.ModeSymlink {
-			followedPath, err := filepath.EvalSymlinks(path)
-			if err == nil {
-				fi, err := os.Lstat(followedPath)
-				if err == nil && fi.IsDir() {
-					return fastwalk.TraverseLink
+	godirwalk.Walk(zenv.root, &godirwalk.Options{
+		FollowSymbolicLinks: followSymlinks,
+		Unsorted:            true,
+		Callback: func(path string, de *godirwalk.Dirent) error {
+			if followSymlinks && de.IsSymlink() {
+				followedPath, err := filepath.EvalSymlinks(path)
+				if err == nil {
+					fi, err := os.Lstat(followedPath)
+					if err == nil && fi.IsDir() {
+						// TraverseLink
+						return nil
+					}
 				}
 			}
-		}
 
-		if info.IsDir() {
-			if path == "." || len(path) <= len(zenv.root) {
-				return nil
+			if de.IsDir() {
+				if path == "." || len(path) <= len(zenv.root) {
+					return nil
+				}
+				if zenv.fre.MatchString(path) {
+					mu.Lock()
+					matches = append(matches, path)
+					mu.Unlock()
+					return nil
+				}
+				if !zenv.dre.MatchString(path + "/") {
+					return godirwalk.SkipThis
+				}
 			}
+
 			if zenv.fre.MatchString(path) {
+				if relative && filepath.IsAbs(path) {
+					path = path[len(zenv.root)+1:]
+				}
 				mu.Lock()
 				matches = append(matches, path)
 				mu.Unlock()
-				return nil
 			}
-			if !zenv.dre.MatchString(path + "/") {
-				return filepath.SkipDir
-			}
-		}
-
-		if zenv.fre.MatchString(path) {
-			if relative && filepath.IsAbs(path) {
-				path = path[len(zenv.root)+1:]
-			}
-			mu.Lock()
-			matches = append(matches, path)
-			mu.Unlock()
-		}
-		return nil
+			return nil
+		},
 	})
 	return matches, nil
 }
