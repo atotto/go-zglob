@@ -18,7 +18,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 )
 
@@ -55,10 +54,8 @@ func FastWalk(root string, walkFn func(path string, typ os.FileMode) error) erro
 	// things we want, in hopes its I/O scheduling can take
 	// advantage of that. Hopefully most are in cache. Maybe 4 is
 	// even too low of a minimum. Profile more.
-	numWorkers := 4
-	if n := runtime.NumCPU(); n > numWorkers {
-		numWorkers = n
-	}
+	//numWorkers := 4
+	numWorkers := 1
 	w := &walker{
 		fn:       walkFn,
 		enqueuec: make(chan walkItem, numWorkers), // buffered for performance
